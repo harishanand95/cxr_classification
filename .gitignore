@@ -1,0 +1,7 @@
+ClinicalReadings/*
+CXR_png/*
+CXR_png.pickle
+NLM-ChinaCXRSet-ReadMe.docx
+NLMCXR_png/*
+NLMCXR_png.tgz
+.DS_Store
