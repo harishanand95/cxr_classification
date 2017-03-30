@@ -1,11 +1,13 @@
 import os 
-import pprint
+# import pprint
 import numpy as np
 # import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from scipy import misc
 from six.moves import cPickle as pickle
 import tensorflow as tf
+from vgg import vgg_16
+import inception_resnet_v2
 # dir_path = os.path.dirname(os.path.realpath(__file__))
 # s = {}
 # files = os.listdir(dir_path + "/ClinicalReadings")
@@ -53,13 +55,11 @@ def load_images(folder, min_num_images):
 			image_file = os.path.join(folder, image)
 			img = mpimg.imread(image_file)
 			gray = rgb2gray(img)
-			gray_scaled = misc.imresize(gray, (640, 480))
+			gray_scaled = misc.imresize(gray, (image_width, image_height))
 			image_data = (gray_scaled.astype(float) - pixel_depth / 2) / pixel_depth
 			if image_data.shape != (image_width, image_height):
 				raise Exception('Unexpected image shape: %s' % str(image_data.shape))
 			dataset[num_images, :, :] = image_data
-			print image_file[-5]
-			print "ADF"
 			if str(image_file[-5]) == "1":
 				labels[num_images] = 1
 			else:
@@ -156,6 +156,8 @@ print('Test set', test_dataset.shape, test_labels.shape)
 
 
 def accuracy(predictions, labels):
+	# shape   = tf.convert_to_tensor(predictions).get_shape().as_list()
+	# prediction = tf.reshape(predictions, [shape[0] * shape[1] * shape[2], shape[3]])
 	return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1)) / predictions.shape[0])
 
 batch_size = 16
@@ -163,9 +165,9 @@ patch_size = 5
 depth = 16
 num_hidden = 64
 num_channels = 1
-graph = tf.Graph()
 
-with graph.as_default():
+graph1 = tf.Graph()
+with graph1.as_default():
 	# Input data.
 	tf_train_dataset = tf.placeholder(tf.float32, shape=(batch_size, image_width, image_height, num_channels))
 	tf_train_labels  = tf.placeholder(tf.float32, shape=(batch_size, num_labels))
@@ -202,24 +204,57 @@ with graph.as_default():
 
 	# Predictions for the training, validation, and test data.
 	train_prediction = tf.nn.softmax(logits)
+
 	valid_prediction = tf.nn.softmax(model(tf_valid_dataset))
-	test_prediction  = tf.nn.softmax(model(tf_test_dataset))
 
+	test_prediction = tf.nn.softmax(model(tf_test_dataset))
 
-num_steps = 200
+# VGGNET-16 Implementation
 
-with tf.Session(graph=graph) as session:
-	tf.initialize_all_variables().run()
-	print('Initialized')
-	for step in range(num_steps):
-		offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
-		batch_data = train_dataset[offset:(offset + batch_size), :, :, :]
-		batch_labels = train_labels[offset:(offset + batch_size), :]
-		feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
-		_, l, predictions = session.run(
-			[optimizer, loss, train_prediction], feed_dict=feed_dict)
-		if (step % 50 == 0):
-			print('Minibatch loss at step %d: %f' % (step, l))
-			print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
-			print('Validation accuracy: %.1f%%' % accuracy(valid_prediction.eval(), valid_labels))
-	print('Test accuracy: %.1f%%' % accuracy(test_prediction.eval(), test_labels))
+# graph2 = tf.Graph();
+# with graph2.as_default():
+# 	# Input data.
+# 	tf_train_dataset = tf.placeholder(tf.float32, shape=(batch_size, image_width, image_height, num_channels))
+# 	tf_train_labels  = tf.placeholder(tf.float32, shape=(batch_size, num_labels))
+# 	tf_valid_dataset = tf.constant(valid_dataset)
+# 	tf_test_dataset  = tf.constant(test_dataset)
+
+# 	logits ,_ = vgg_16(tf_train_dataset, num_classes=2, spatial_squeeze=False)
+# 	loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=tf_train_labels))
+# 	optimizer = tf.train.GradientDescentOptimizer(0.05).minimize(loss)
+# 	train_prediction = tf.nn.softmax(logits)
+
+# 	with tf.variable_scope("g2valid") as scope:
+# 		_1, _ = vgg_16(tf_valid_dataset, num_classes=2, is_training=False, spatial_squeeze=False)
+# 	valid_prediction = tf.nn.softmax(_1)
+
+# 	with tf.variable_scope("g2test") as scope:
+# 		_2, _ = vgg_16(tf_test_dataset, num_classes=2, is_training=False, spatial_squeeze=False)
+# 	test_prediction  = tf.nn.softmax(_2)
+
+num_steps = 20
+def run_training(graph):
+	with tf.Session(graph=graph) as session:
+		tf.initialize_all_variables().run()
+		# summary_writer = tf.summary.FileWriter('log_simple_stats', session.graph)
+		print('Initialized')
+		for step in range(num_steps):
+			offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
+			batch_data = train_dataset[offset:(offset + batch_size), :, :, :]
+			batch_labels = train_labels[offset:(offset + batch_size), :]
+			feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
+			_, l, predictions = session.run(
+				[optimizer, loss, train_prediction], feed_dict=feed_dict)
+			print "Prediction" 
+			print predictions
+			print "Values" 
+			print batch_labels
+			# summary_writer.add_summary(session.run(summaries), step)
+			if (step % 5 == 0):
+				print('Minibatch loss at step %d: %f' % (step, l))
+				print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
+				print('Validation accuracy: %.1f%%' % accuracy(valid_prediction.eval(), valid_labels))
+		print('Test accuracy: %.1f%%' % accuracy(test_prediction.eval(), test_labels))
+
+run_training(graph1)
+
