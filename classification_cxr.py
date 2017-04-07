@@ -203,13 +203,13 @@ with graph1.as_default():
 		valid_prediction = tf.nn.softmax(model(tf_valid_dataset))
 	with tf.name_scope("test"):
 		test_prediction = tf.nn.softmax(model(tf_test_dataset))
-	summ = tf.summary.merge_all()
+	merged_summary = tf.summary.merge_all() # to get all var summaries in one place.
 
 num_steps = 20
 def run_training(graph):
 	with tf.Session(graph=graph) as session:
 		tf.initialize_all_variables().run()
-		writer = tf.summary.FileWriter('/tmp/log_simple_stats/3')
+		writer = tf.summary.FileWriter('/tmp/log_simple_stats/4')
 		writer.add_graph(session.graph)
 
 		print('Initialized')
@@ -218,14 +218,11 @@ def run_training(graph):
 			batch_data = train_dataset[offset:(offset + batch_size), :, :, :]
 			batch_labels = train_labels[offset:(offset + batch_size), :]
 			feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
-			_, l, predictions = session.run(
-				[optimizer, loss, train_prediction], feed_dict=feed_dict)
-			# print "Prediction" 
-			# print predictions
-			# print "Values" 
-			# print batch_labels
-			# summary_writer.add_summary(session.run(summaries), step)
+			_ = session.run([optimizer], feed_dict=feed_dict)
 			if (step % 5 == 0):
+				l, predictions = session.run([loss, train_prediction], feed_dict=feed_dict)
+				s = session.run(merged_summary, feed_dict=feed_dict)
+				writer.add_summary(s, step)
 				print('Minibatch loss at step %d: %f' % (step, l))
 				print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
 				print('Validation accuracy: %.1f%%' % accuracy(valid_prediction.eval(), valid_labels))
