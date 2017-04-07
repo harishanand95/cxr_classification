@@ -132,13 +132,10 @@ print('Validation set', valid_dataset.shape, valid_labels.shape)
 print('Test set', test_dataset.shape, test_labels.shape)
 
 
-def accuracy(predictions, labels):
-	# shape   = tf.convert_to_tensor(predictions).get_shape().as_list()
-	# prediction = tf.reshape(predictions, [shape[0] * shape[1] * shape[2], shape[3]])
-	with tf.name_scope("accuracy"):
-		accuracy = (100.0 * np.sum(np.argmax(predictions , 1) == np.argmax(labels, 1)) / predictions.shape[0])
-		tf.summary.scalar("accuracy", accuracy)
-		return accuracy
+# def accuracy(predictions, labels):
+# 	with tf.name_scope("accuracy"):
+# 		accuracy = (100.0 * np.sum(np.argmax(predictions , 1) == np.argmax(labels, 1)) / predictions.shape[0])
+# 		return accuracy
 
 batch_size = 16
 patch_size = 5
@@ -150,14 +147,15 @@ graph1 = tf.Graph()
 with graph1.as_default():
 	# Input data.
 	tf_train_dataset = tf.placeholder(tf.float32, shape=(batch_size, image_width, image_height, num_channels),name="input")
+	tf.summary.image('train_input', tf_train_dataset, 3)
 	tf_train_labels  = tf.placeholder(tf.float32, shape=(batch_size, num_labels),name="labels")
-	tf_valid_dataset = tf.constant(valid_dataset)
-	tf_test_dataset  = tf.constant(test_dataset)
+	# tf_valid_dataset = tf.constant(valid_dataset)
+	# tf_test_dataset  = tf.constant(test_dataset)
 
 	def conv(data, patch_size, num_channels, depth, name="conv"):
 		with tf.name_scope(name):
 			W = tf.Variable(tf.truncated_normal([patch_size, patch_size, num_channels, depth], stddev=0.1),name="W")
-			B  = tf.Variable(tf.zeros([depth]),name="B")
+			B  = tf.Variable(tf.constant(0.1,shape=[depth]),name="B")
 			conv    = tf.nn.conv2d(data, W, [1, 2, 2, 1], padding='SAME') # zero padded to keep ratio same
 			activation  = tf.nn.relu(conv + B)
 			tf.summary.histogram("weights", W)
@@ -165,13 +163,10 @@ with graph1.as_default():
 			tf.summary.histogram("activation", activation)
 			return activation
 
-# [image_width // 4 * image_height // 4 * depth, num_hidden]
-# [num_hidden, num_labels]
-
 	def fc_layer(data, width, height, name="fc"):
 		with tf.name_scope(name):
-			W = tf.Variable(tf.truncated_normal([width, height], stddev=0.1),name="W")
-			B  = tf.Variable(tf.constant(1.0, shape=[height]),name="B")
+			W = tf.Variable(tf.truncated_normal([width, height], stddev=0.1), name="W")
+			B  = tf.Variable(tf.constant(0.1, shape=[height]), name="B")
 			mul = tf.matmul(data,W)
 			activation  = tf.nn.relu(mul + B)
 			tf.summary.histogram("weights", W)
@@ -191,42 +186,59 @@ with graph1.as_default():
 	logits = model(tf_train_dataset)
 	with tf.name_scope("loss"):
 		loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=tf_train_labels))
-	tf.summary.scalar("loss", loss)
+		tf.summary.scalar("loss", loss)
 	# Optimizer.
 	with tf.name_scope("optimiser"):
 		optimizer = tf.train.GradientDescentOptimizer(0.05).minimize(loss)
-
+	# Accuracy
+	def accuracy(predictions, labels):
+		with tf.name_scope("accuracy"):
+		    correct_prediction = tf.equal(tf.argmax(predictions, 1), tf.argmax(labels, 1))
+		    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+		    tf.summary.scalar("accuracy", accuracy)
+		    return accuracy*100
 	# Predictions for the training, validation, and test data.
 	with tf.name_scope("train"):
-		train_prediction = tf.nn.softmax(logits)
+		train_accuracy = accuracy(logits, tf_train_labels)
 	with tf.name_scope("valid"):
-		valid_prediction = tf.nn.softmax(model(tf_valid_dataset))
+		valid_prediction = tf.nn.softmax(model(tf_train_dataset))
+		valid_accuracy = accuracy(valid_prediction, tf_train_labels)
 	with tf.name_scope("test"):
-		test_prediction = tf.nn.softmax(model(tf_test_dataset))
+		test_prediction = tf.nn.softmax(model(tf_train_dataset))
+		test_accuracy = accuracy(test_prediction, tf_train_labels)
 	merged_summary = tf.summary.merge_all() # to get all var summaries in one place.
 
 num_steps = 20
+def get_input_in_batch_size(step, dataset, labels):
+	offset = (step * batch_size) % (labels.shape[0] - batch_size)
+	batch_data = dataset[offset:(offset + batch_size), :, :, :]
+	batch_labels = labels[offset:(offset + batch_size), :]
+	return batch_data, batch_labels	
+
 def run_training(graph):
 	with tf.Session(graph=graph) as session:
 		tf.initialize_all_variables().run()
-		writer = tf.summary.FileWriter('/tmp/log_simple_stats/4')
+		writer = tf.summary.FileWriter('/tmp/log_simple_stats/3')
 		writer.add_graph(session.graph)
 
 		print('Initialized')
-		for step in range(num_steps):
-			offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
-			batch_data = train_dataset[offset:(offset + batch_size), :, :, :]
-			batch_labels = train_labels[offset:(offset + batch_size), :]
+		for step in range(num_steps):	
+			batch_data, batch_labels = get_input_in_batch_size(step, train_dataset, train_labels)
 			feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
 			_ = session.run([optimizer], feed_dict=feed_dict)
 			if (step % 5 == 0):
-				l, predictions = session.run([loss, train_prediction], feed_dict=feed_dict)
+				l = session.run([loss], feed_dict=feed_dict)
+				train_acc = session.run([train_accuracy], feed_dict=feed_dict)
+				batch_data, batch_labels = get_input_in_batch_size(step, valid_dataset, valid_labels)
+				valid_acc = session.run([valid_accuracy], feed_dict={tf_train_dataset : batch_data, tf_train_labels : batch_labels})
 				s = session.run(merged_summary, feed_dict=feed_dict)
 				writer.add_summary(s, step)
-				print('Minibatch loss at step %d: %f' % (step, l))
-				print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
-				print('Validation accuracy: %.1f%%' % accuracy(valid_prediction.eval(), valid_labels))
-		print('Test accuracy: %.1f%%' % accuracy(test_prediction.eval(), test_labels))
+				print('Minibatch loss at step %d: %f' % (step, l[0]))
+				print('Minibatch accuracy: %.1f%%' % train_acc[0])
+				print('Validation accuracy: %.1f%%' % valid_acc[0])
+		batch_data, batch_labels = get_input_in_batch_size(step, test_dataset, test_labels)		
+		test_acc = session.run([test_accuracy], feed_dict={tf_train_dataset : batch_data, tf_train_labels : batch_labels})		
+		print('Test accuracy: %.1f%%' % test_acc[0])
 
 run_training(graph1)
 
