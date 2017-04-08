@@ -160,7 +160,7 @@ network = conv_2d(network, depth, filter_size, [1,2,2,1], activation='relu', reg
 network = fully_connected(network, 64)
 network = dropout(network, 0.8)
 network = fully_connected(network, num_labels, activation='softmax')
-network = regression(network, optimizer='sgd', learning_rate=0.001,
+network = regression(network, optimizer='adam', learning_rate=0.001,
                      loss='categorical_crossentropy', name='target')
 
 # Training
