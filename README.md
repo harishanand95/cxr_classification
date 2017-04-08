@@ -26,3 +26,6 @@ Here is the image of an attempted small model.
 ![alt text](https://github.com/harishanand95/cxr_classification/blob/master/tflearn_model.png?raw=true "Model")
 
 classification_cxr.py has a model made in tensorflow itself while tflearn_classify has tflearn library used.
+
+##### classification_cxr.py 's model
+![alt text](https://github.com/harishanand95/cxr_classification/blob/master/classification_cxr.png?raw=true "Model")
