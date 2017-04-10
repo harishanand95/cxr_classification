@@ -10,9 +10,6 @@ import tensorflow as tf
 
 def rgb2gray(rgb):
 	return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
-  
-# plt.imshow(gray, cmap = plt.get_cmap('gray'))
-# plt.show()
 
 image_width = 640
 image_height = 480
