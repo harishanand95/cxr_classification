@@ -14,14 +14,14 @@ It is requested that publications resulting from the use of this data attribute 
 Here is the image of an attempted small model.
 
 * Input is in 640x480 image in greyscale.
-* Split across as (182,180,300) for validation, test and train images respectively.
-* (640x480x1) input after conv1 operation of stride 2 and 16 layer depth changes to (320x240x16).
-* (320x240x16) input after conv1 operation of stride 2 and 16 layer depth changes to (160x120x16).
-* Relu and L2 regularisation is used here to avoid traps.
+* Images are split across as 182 validation, 180 test and 300 train images.
+* (640x480x1) input after conv1 operation of stride 2 and with 16 filters changes to (320x240x16).
+* (320x240x16) input after conv2 operation of stride 2 and with 16 filters changes to (160x120x16).
+* Relu and L2 regularisation is used.
 * A fully connected layer follows it and flattens it to 64 neurons.
 * Dropout is used as normalisation after previous layer.
 * A final FC layer with softmax function outputs a score on 2 values (TB,NoTB).
-* Adam optimizer is used as SGD optimiser had difficulty generating graphs. This also means more parameters to store.
+* Adam optimizer is used as SGD optimiser had difficulty generating graphs.
 
 ![alt text](https://github.com/harishanand95/cxr_classification/blob/master/tflearn_model.png?raw=true "Model")
 
