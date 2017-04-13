@@ -2,24 +2,24 @@ import os
 import numpy as np
 import tensorflow as tf
 from Model import ChinaCXRDataset
+from sklearn.utils import shuffle
 
 image_width = 640
 image_height = 480
 pixel_depth = 255.0  # Number of levels per pixel.
 
-model = ChinaCXRDataset("CXR_png")
+cxr_model = ChinaCXRDataset("CXR_png")
 
 if os.path.isfile("CXR_png_gray.pickle"):
-    model.load_from_pickle("CXR_png_gray.pickle")
+    cxr_model.load_from_pickle("CXR_png_gray.pickle")
 else:
-    model.load_images(image_width, image_height, pixel_depth, convert_to_gray=True)
-    model.separate_test_dataset(200)
-    model.save(dataset_filename="CXR_png_gray.pickle")
+    cxr_model.load_images(image_width, image_height, pixel_depth, convert_to_gray=True)
+    cxr_model.separate_test_dataset(200)
+    cxr_model.save(dataset_filename="CXR_png_gray.pickle")
 
-train_dataset, train_labels, _ = model.random_images(120)
-valid_dataset, valid_labels, _ = model.random_images(120)
-test_dataset, test_labels, _ = model.random_images(120, test_images=True)
-
+train_dataset, train_labels = cxr_model.random_images(120)
+valid_dataset, valid_labels = cxr_model.random_images(120)
+test_dataset, test_labels = cxr_model.random_images(120, test_images=True)
 num_labels = 2
 
 
@@ -93,9 +93,9 @@ with graph1.as_default():
         conv2 = conv(conv1, kernel_size, depth, depth, name="conv2")
         shape = conv2.get_shape().as_list()
         reshape = tf.reshape(conv2, [shape[0], shape[1] * shape[2] * shape[3]], name="reshape_fc")
-        reshape = tf.cond(train, lambda: tf.nn.dropout(reshape, keep_prob=0.7), lambda : reshape)
+        reshape = tf.cond(train, lambda: tf.nn.dropout(reshape, keep_prob=0.7), lambda: reshape)
         fc1 = fc_layer(reshape, image_width // 4 * image_height // 4 * depth, num_hidden, name="fc1")
-        fc2 = tf.cond(train, lambda: tf.nn.dropout(fc1, keep_prob=0.7), lambda : fc1)
+        fc2 = tf.cond(train, lambda: tf.nn.dropout(fc1, keep_prob=0.7), lambda: fc1)
         fc3 = fc_layer(fc2, num_hidden, num_labels, name="fc2")
         return fc3
 
@@ -117,11 +117,12 @@ with graph1.as_default():
     merged_summary = tf.summary.merge_all()  # to get all var summaries in one place.
 
 
-def get_input_in_batch_size(step, dataset, labels):
-    offset = (step * batch_size) % (labels.shape[0] - batch_size)
-    batch_data = dataset[offset:(offset + batch_size), :, :, :]
-    batch_labels = labels[offset:(offset + batch_size), :]
-    return batch_data, batch_labels
+def get_input_in_batch_size(batch_length, is_train=True):
+    if is_train is False:
+        batch_data, batch_labels = cxr_model.random_images(batch_length, test_images=True, do_shuffle=True)
+    else:
+        batch_data, batch_labels = cxr_model.random_images(batch_length, do_shuffle=True)
+    return reformat(batch_data, batch_labels)
 
 num_steps = 500
 
@@ -129,16 +130,16 @@ num_steps = 500
 def run_training(graph):
     with tf.Session(graph=graph) as session:
         tf.initialize_all_variables().run()
-        writer = tf.summary.FileWriter('/tmp/log_simple_stats/2')
+        writer = tf.summary.FileWriter('/tmp/log_simple_stats/5')
         writer.add_graph(session.graph)
         print('Initialized')
 
         for step in range(num_steps):
-            batch_data, batch_labels = get_input_in_batch_size(step, train_dataset, train_labels)
+            batch_data, batch_labels = get_input_in_batch_size(batch_size, is_train=True)
             feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels, train: True}
             _ = session.run([optimizer], feed_dict=feed_dict)
             if step % 5 == 0:
-                batch_data, batch_labels = get_input_in_batch_size(step, valid_dataset, valid_labels)
+                batch_data, batch_labels = get_input_in_batch_size(batch_size, is_train=True)
                 feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels, train: True}
                 valid_acc = session.run([train_accuracy], feed_dict=feed_dict)
                 l = session.run([loss], feed_dict=feed_dict)
@@ -146,15 +147,14 @@ def run_training(graph):
                 writer.add_summary(va, step)
                 print('Validation loss at step %d: %f' % (step, l[0]))
                 print('Validation accuracy: %.1f%%' % (valid_acc[0]*100))
-        batch_data, batch_labels = get_input_in_batch_size(0, test_dataset, test_labels)
+        batch_data, batch_labels = get_input_in_batch_size(batch_size, is_train=False)
         feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels, train: False}
         test_acc = session.run([train_accuracy], feed_dict=feed_dict)
         test_loss = session.run([loss], feed_dict=feed_dict)
-        print('Test loss at step %d: %f' % (step, test_loss[0]))
+        print('Test loss at step %d: %f' % (1000, test_loss[0]))
         print('Test accuracy: %.1f%%' % (test_acc[0] * 100))
         te = session.run(merged_summary, feed_dict=feed_dict)
         writer.add_summary(te, 1000)
         print(test_acc)
-
 
 run_training(graph1)

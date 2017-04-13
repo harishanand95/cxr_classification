@@ -110,7 +110,7 @@ class ChinaCXRDataset:
         except Exception as e:
             print('Unable to save data to', dataset_filename, ':', e)
 
-    def random_images(self, count, test_images=False):
+    def random_images(self, count, test_images=False, do_shuffle=False):
         if test_images is True and self._test_data_size == 0:
             print("0 images in the test dataset. Use separate_test_dataset() to load images to test dataset.")
             return None
@@ -134,11 +134,13 @@ class ChinaCXRDataset:
             for i in np.random.randint(low=0, high=self._valid_images_count, size=count):
                 dataset[num, ...] = self._dataset[i, ...]
                 labels[num] = self._labels[i]
-        return dataset, labels, num
+        if do_shuffle is True:
+            shuffle(dataset, labels, random_state=0)
+        return dataset, labels
 
     def separate_test_dataset(self, num_of_test_images):
         if self._test_data_size != 0:
-            print "Test files of size %s is already present in test dataset." % self._test_data_size
+            print("Test files of size %s is already present in test dataset." % str(self._test_data_size))
             return None
         if num_of_test_images >= self._valid_images_count:
             print("Dataset dont possess that many images.")
@@ -158,11 +160,3 @@ class ChinaCXRDataset:
         self._valid_images_count -= self._test_data_size
         self._dataset = self._dataset[0:self._valid_images_count, :, :, :]
         self._labels = self._labels[0:self._valid_images_count]
-
-        print "self._test_data_size %s"% str(self._test_data_size)
-        print "self._valid_count %s"% str(self._valid_images_count)
-        print "self._labels.shape %s"% str(self._labels.shape)
-        print "self._dataset.shape %s"% str(self._dataset.shape)
-        print "self._test_labels.shape %s"% str(self._test_labels.shape)
-        print "self._test_dataset.shape %s"% str(self._test_dataset.shape)
-
