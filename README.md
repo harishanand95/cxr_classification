@@ -21,7 +21,7 @@ Here is the image of an attempted small model.
 * A fully connected layer follows it and flattens it to 64 neurons.
 * Dropout is used as normalisation after previous layer.
 * A final FC layer with softmax function outputs a score on 2 values (TB,NoTB).
-* Adam optimizer is used as SGD optimiser had difficulty generating graphs.
+* Adam optimizer is used.
 
 ![alt text](https://github.com/harishanand95/cxr_classification/blob/master/tflearn_model.png?raw=true "Model")
 
