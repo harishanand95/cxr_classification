@@ -1,6 +1,6 @@
 ### This is attempt at classifying CXR images into Tuberculosis and non-tuberculosis categories
 
-[Under-development] JSRT lung nodule classification (and locating) over CT scan images. https://github.com/harishanand95/jsrt-parser 
+### [Under-development] JSRT lung nodule classification (and locating) over CT scan images. https://github.com/harishanand95/jsrt-parser 
 
 China Set - The Shenzhen set - Chest X-ray Database
 Description: The standard digital image database for Tuberculosis is created by the National Library of Medicine, Maryland, USA in collaboration with Shenzhen No.3 People’s Hospital, Guangdong Medical College, Shenzhen, China. The Chest X-rays are from out-patient clinics, and were captured as part of the daily routine using Philips DR Digital Diagnose systems. 
